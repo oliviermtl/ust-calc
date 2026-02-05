@@ -108,7 +108,7 @@ describe("calculateVatBreakdown", () => {
     expect(result.totalBrutto).toBe(12);
   });
 
-  it("uses tva field (confhub compat)", () => {
+  it("uses tva field (website compat)", () => {
     const items: RawItem[] = [{ price: 12, tva: 20, amount: 2 }];
     const result = calculateVatBreakdown(items);
 

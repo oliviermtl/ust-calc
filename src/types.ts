@@ -1,8 +1,8 @@
 /**
  * Raw item as it comes from various projects.
  * Fields are optional because different projects use different naming conventions:
- * - VAT rate: `tva` (confhub, punsch-taxi cart) or `ust` (invoicepunschtaxi, punsch-taxi invoice)
- * - Quantity: `amount` (confhub, punsch-taxi cart), `quantity` (invoicepunschtaxi), or `value` (createRechnung)
+ * - VAT rate: `tva` (website, punsch-taxi cart) or `ust` (invoicepunschtaxi, punsch-taxi invoice)
+ * - Quantity: `amount` (website, punsch-taxi cart), `quantity` (invoicepunschtaxi), or `value` (createRechnung)
  */
 export interface RawItem {
   price: number;

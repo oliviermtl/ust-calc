@@ -124,7 +124,7 @@ describe("Algorithm equivalence", () => {
       const ust = 10;
       const discount = 0;
 
-      // Stored priceNetto (no rounding, as confhub createInvoice.ts does)
+      // Stored priceNetto (no rounding, as website createInvoice.ts does)
       const storedPriceNetto = price / (ust / 100 + 1); // 11.363636...
 
       // Algorithm C: diff = brutto - storedNetto (per item)
@@ -181,13 +181,9 @@ describe("Algorithm equivalence", () => {
       // result = 14.45 - 1.01 = 13.44
       const legacyNetto = Number(legacyBigDecimalRound(15.9 / 1.1, 2));
       expect(legacyNetto).toBe(14.45);
-      const legacyRabbatPrice = Number(
-        legacyBigDecimalRound(14.45 * 0.93, 2),
-      );
+      const legacyRabbatPrice = Number(legacyBigDecimalRound(14.45 * 0.93, 2));
       expect(legacyRabbatPrice).toBe(13.44);
-      const legacyRabbatValue = Number(
-        legacyBigDecimalRound(14.45 - 13.44, 2),
-      );
+      const legacyRabbatValue = Number(legacyBigDecimalRound(14.45 - 13.44, 2));
       const legacyResult = 14.45 - legacyRabbatValue;
       expect(legacyResult).toBe(13.44);
 
