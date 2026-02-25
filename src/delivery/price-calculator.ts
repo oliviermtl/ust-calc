@@ -20,7 +20,7 @@ import type { DeliveryPrices, PriceCalculationConfig } from "./types";
 export function calculateDeliveryPrices(
   distanceMeters: number,
   durationSeconds: number,
-  config?: Partial<PriceCalculationConfig>
+  config?: Partial<PriceCalculationConfig>,
 ): DeliveryPrices {
   const cfg = { ...DEFAULT_PRICE_CONFIG, ...config };
 
@@ -48,13 +48,13 @@ export function calculateDeliveryPrices(
   const costTotal = driverCost.plus(gasCost);
 
   return {
-    single: costTotal.round().toNumber(),
-    double: costTotal.times(2).round().toNumber(),
+    single: costTotal.toDecimalPlaces(0).toNumber(),
+    double: costTotal.toDecimalPlaces(0).times(2).toNumber(),
     calculationDetails: {
-      totalDistanceKm: totalDistanceKm.toDecimalPlaces(2).toNumber(),
-      totalDuration: totalDurationMinutes.toDecimalPlaces(2).toNumber(),
-      driverCost: driverCost.toDecimalPlaces(2).toNumber(),
-      gasCost: gasCost.toDecimalPlaces(2).toNumber(),
+      totalDistanceKm: totalDistanceKm.toDecimalPlaces(0).toNumber(),
+      totalDuration: totalDurationMinutes.toDecimalPlaces(0).toNumber(),
+      driverCost: driverCost.toDecimalPlaces(0).toNumber(),
+      gasCost: gasCost.toDecimalPlaces(0).toNumber(),
     },
   };
 }
