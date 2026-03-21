@@ -1,7 +1,13 @@
 import Decimal from "decimal.js";
 import { normalizeItem } from "./normalize";
 import { getNettoPrice } from "./core";
-import type { RawItem, VatBreakdown, BreakdownOptions } from "./types";
+import type {
+  RawItem,
+  VatBreakdown,
+  BreakdownOptions,
+  CartTotalsOptions,
+  CartTotals,
+} from "./types";
 
 /**
  * Compute a full Austrian VAT breakdown from a list of items.
@@ -90,5 +96,79 @@ export function calculateVatBreakdown(
     grandTotal: grandTotal
       .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
       .toNumber(),
+  };
+}
+
+const DEFAULT_EXCLUDED_PDFCATEGORY_KEYS = [
+  "service-mitarbeiter",
+  "personalkosten-speisen",
+  "personalkosten-getranke",
+];
+
+/**
+ * Compute cart totals with free-shipping threshold logic.
+ *
+ * Higher-level wrapper around `calculateVatBreakdown` that:
+ * 1. Filters items by `inSumme !== false` (billable items only).
+ * 2. Computes items-only netto for the cart total.
+ * 3. Checks the free-shipping threshold, optionally excluding
+ *    worker/staff pdfcategory keys from the threshold calculation.
+ * 4. Computes the final VAT breakdown with or without shipping.
+ */
+export function calculateCartTotals(
+  items: RawItem[],
+  options: CartTotalsOptions
+): CartTotals {
+  const {
+    deliveryFeeNetto,
+    freeDeliveryMultiplier = 4,
+    excludeFromThreshold = DEFAULT_EXCLUDED_PDFCATEGORY_KEYS,
+    precision = 2,
+  } = options;
+
+  // 1. Filter to billable items (inSumme !== false)
+  const billableItems = items.filter((i) => i.inSumme !== false);
+
+  // 2. Items-only breakdown (no shipping) for cartNetto
+  const itemsOnly = calculateVatBreakdown(billableItems, { precision });
+  const cartNetto = itemsOnly.totalNetto;
+
+  // 3. Threshold check — exclude worker pdfcategory keys
+  const excludeSet = new Set(excludeFromThreshold);
+  const thresholdItems =
+    excludeSet.size > 0
+      ? billableItems.filter(
+          (i) =>
+            !i.pdfcategory?.key || !excludeSet.has(i.pdfcategory.key)
+        )
+      : billableItems;
+  const thresholdBreakdown =
+    thresholdItems.length !== billableItems.length
+      ? calculateVatBreakdown(thresholdItems, { precision })
+      : itemsOnly;
+  const cartNettoWithoutWorkers = thresholdBreakdown.totalNetto;
+  const freeDeliveryFrom = deliveryFeeNetto * freeDeliveryMultiplier;
+  const freeShipping = cartNettoWithoutWorkers > freeDeliveryFrom;
+
+  // 4. Final breakdown with shipping if applicable
+  // Guard: no shipping when cart netto is negative (e.g. credit/refund carts)
+  const deliveryFee =
+    freeShipping || deliveryFeeNetto <= 0 || cartNetto < 0
+      ? 0
+      : deliveryFeeNetto;
+  const breakdown =
+    deliveryFee > 0
+      ? calculateVatBreakdown(billableItems, {
+          shippingCostNetto: deliveryFee,
+          precision,
+        })
+      : itemsOnly;
+
+  return {
+    breakdown,
+    cartNetto,
+    cartNettoWithoutWorkers,
+    deliveryFee,
+    freeShipping,
   };
 }

@@ -15,6 +15,8 @@ export interface RawItem {
   priceNetto?: number;
   inSumme?: boolean;
   name?: string;
+  id?: number | string | null;
+  pdfcategory?: { key: string } | null;
 }
 
 /**
@@ -61,4 +63,33 @@ export interface BreakdownOptions {
   shippingCostNetto?: number;
   /** Decimal places for intermediate rounding (default: 2) */
   precision?: number;
+}
+
+export interface CartTotalsOptions {
+  /** Netto delivery fee when shipping applies */
+  deliveryFeeNetto: number;
+  /** Free-shipping multiplier applied to deliveryFeeNetto (default: 4) */
+  freeDeliveryMultiplier?: number;
+  /**
+   * pdfcategory keys to exclude from the threshold check.
+   * Items with a matching `pdfcategory.key` still count toward cartNetto
+   * and the final breakdown, but not toward the free-shipping threshold.
+   * Default: ["service-mitarbeiter", "personalkosten-speisen", "personalkosten-getranke"]
+   */
+  excludeFromThreshold?: string[];
+  /** Rounding precision (default: 2) */
+  precision?: number;
+}
+
+export interface CartTotals {
+  /** Full VAT breakdown including shipping if applicable */
+  breakdown: VatBreakdown;
+  /** Items-only netto total (after inSumme filter, no shipping) */
+  cartNetto: number;
+  /** Netto total excluding worker products (used for threshold check) */
+  cartNettoWithoutWorkers: number;
+  /** Actual delivery fee applied (0 when free shipping) */
+  deliveryFee: number;
+  /** Whether the free-shipping threshold was met */
+  freeShipping: boolean;
 }
