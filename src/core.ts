@@ -19,8 +19,7 @@ Decimal.set({ rounding: Decimal.ROUND_HALF_UP });
  * @returns Netto price as a JS number (per single unit, NOT multiplied by quantity).
  */
 export function getNettoPrice(item: RawItem, options: NettoOptions = {}): number {
-  // TODO: we need safeguard here, if item has no ust we return 0
-  if (!item.ust) return 0;
+  if (!item || !item.ust) return 0;
 
   const { precision = 2, discountOn = "netto" } = options;
   const normalized = normalizeItem(item);

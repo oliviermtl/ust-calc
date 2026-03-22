@@ -37,6 +37,7 @@ export function calculateVatBreakdown(
   let tipTotal = d(0);
 
   for (const item of items) {
+    if (!item) continue;
     const normalized = normalizeItem(item);
     const { vatRate, quantity } = normalized;
 

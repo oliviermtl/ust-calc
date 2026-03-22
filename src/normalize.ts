@@ -15,6 +15,10 @@ export function normalizeItem(
   raw: RawItem,
   defaultVatRate: number = 20
 ): TaxableItem {
+  if (!raw) {
+    return { price: 0, vatRate: defaultVatRate, quantity: 0, discount: 0 };
+  }
+
   // VAT rate: prefer ust, fall back to tva, then default.
   // ?? ensures 0 is preserved (fixes BUG 5 where || treated 0 as falsy → 20%).
   const vatRate = raw.ust ?? raw.tva ?? defaultVatRate;
