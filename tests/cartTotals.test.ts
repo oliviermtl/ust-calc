@@ -305,18 +305,22 @@ describe("calculateCartTotals", () => {
   });
 
   describe("tips handling", () => {
-    it("tips do not affect cartNetto (ust:0 items return netto 0)", () => {
-      // Known behavior: getNettoPrice returns 0 for ust:0 items
-      // (see TODO in core.ts line 23). Tips are effectively zero in
-      // the VAT breakdown. This test documents current behavior.
+    it("keeps tips out of cartNetto but counts them in grandTotal", () => {
+      // Tips are 0%-rated, so they belong in their own bucket: excluded from the netto/VAT
+      // totals, added back into grandTotal. See breakdown.ts — `vatRate === 0` accumulates
+      // into tipTotal and skips the 10/20 buckets.
+      //
+      // This previously asserted tipTotal 0 and grandTotal 12, documenting the getNettoPrice
+      // bug where `if (!item.ust) return 0` zeroed every tax-exempt item. That made the tip
+      // bucket inert and silently dropped tips from grandTotal.
       const items: RawItem[] = [food20(12, 1), tip(5)];
       const result = calculateCartTotals(items, {
         deliveryFeeNetto: 0,
       });
 
       expect(result.cartNetto).toBe(10);
-      expect(result.breakdown.tipTotal).toBe(0);
-      expect(result.breakdown.grandTotal).toBe(12);
+      expect(result.breakdown.tipTotal).toBe(5);
+      expect(result.breakdown.grandTotal).toBe(17);
     });
   });
 
