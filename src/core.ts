@@ -19,7 +19,18 @@ Decimal.set({ rounding: Decimal.ROUND_HALF_UP });
  * @returns Netto price as a JS number (per single unit, NOT multiplied by quantity).
  */
 export function getNettoPrice(item: RawItem, options: NettoOptions = {}): number {
-  if (!item || !item.ust) return 0;
+  // Only a missing item or an unusable price yields 0.
+  //
+  // This guard deliberately does NOT test `item.ust`. Doing so treated three legitimate cases as
+  // "no price": a tax-exempt item (`ust: 0` — tips are 0%-rated), an item carrying `tva` instead
+  // of `ust` (customer-site payloads), and an item with no VAT field at all, which must default
+  // to 20%. All three are resolved correctly by `normalizeItem` via `ust ?? tva ?? 20`, and the
+  // tax-exempt branch below already handled `vatRate === 0` — the old guard made it dead code.
+  //
+  // The price check preserves the old behaviour for malformed input from JS callers: `RawItem`
+  // types `price` as required, but an undefined price previously returned 0 here and would now
+  // otherwise reach `new Decimal(undefined)`, which throws.
+  if (!item || !Number.isFinite(Number(item.price))) return 0;
 
   const { precision = 2, discountOn = "netto" } = options;
   const normalized = normalizeItem(item);

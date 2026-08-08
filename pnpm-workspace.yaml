@@ -1,0 +1,4 @@
+# esbuild ships a platform-specific binary; tsup needs its install script to run.
+# Without this, pnpm 11 blocks the postinstall and `pnpm build` fails on a fresh install.
+allowBuilds:
+  esbuild: true
