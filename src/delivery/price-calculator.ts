@@ -77,3 +77,28 @@ export function calculateDeliveryPrices(
     },
   };
 }
+
+/**
+ * The handling time a cart implies, in minutes.
+ *
+ * Loading a vehicle onto a trailer and strapping it down takes longer than
+ * handing over a crate, so a product may declare its own handling time. All of
+ * a cart's products share one trip and the slowest sets the pace, so this takes
+ * the largest declared value — and never drops below the default, because the
+ * base load and unload happens on every delivery whatever is in the van. A
+ * product can therefore raise the floor but never lower it.
+ *
+ * @param declaredMinutes - Each item's own handling time; null or undefined for
+ *   every product that has not declared one
+ * @param defaultMinutes - The floor, defaulting to the shared config value
+ * @returns The handling time to price the trip with
+ */
+export function resolveHandlingTimeMinutes(
+  declaredMinutes: ReadonlyArray<number | null | undefined>,
+  defaultMinutes: number = DEFAULT_PRICE_CONFIG.handlingTimeMinutes,
+): number {
+  return declaredMinutes.reduce<number>((longest, minutes) => {
+    const value = Number(minutes);
+    return Number.isFinite(value) && value > longest ? value : longest;
+  }, defaultMinutes);
+}

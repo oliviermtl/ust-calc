@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   calculateDeliveryPrices,
+  resolveHandlingTimeMinutes,
   isViennaPostalCode,
   selectOptimalOrigin,
   selectOriginForProducts,
@@ -149,6 +150,53 @@ describe("calculateDeliveryPrices", () => {
 
     expect(result.single).toBe(399);
     expect(result.double).toBe(798);
+  });
+});
+
+describe("resolveHandlingTimeMinutes", () => {
+  it("falls back to the default when no product declares one", () => {
+    expect(resolveHandlingTimeMinutes([null, undefined, null])).toBe(30);
+  });
+
+  it("uses the longest declared time", () => {
+    expect(resolveHandlingTimeMinutes([null, 90, 45])).toBe(90);
+  });
+
+  it("never drops below the default", () => {
+    // A product may raise the floor, never lower it: the base load and unload
+    // happens on every delivery whatever is in the van.
+    expect(resolveHandlingTimeMinutes([10, 20])).toBe(30);
+  });
+
+  it("ignores values that are not finite numbers", () => {
+    expect(
+      resolveHandlingTimeMinutes([
+        NaN,
+        Infinity,
+        "90" as unknown as number,
+        undefined,
+      ]),
+    ).toBe(90);
+  });
+
+  it("accepts a custom floor", () => {
+    expect(resolveHandlingTimeMinutes([], 45)).toBe(45);
+  });
+
+  it("handles an empty cart", () => {
+    expect(resolveHandlingTimeMinutes([])).toBe(30);
+  });
+
+  it("prices a trailered truck to Traboch", () => {
+    // 90 minutes of handling instead of 30 adds an hour of driver time.
+    const handlingTimeMinutes = resolveHandlingTimeMinutes([null, 90]);
+    const result = calculateDeliveryPrices(172117, 7068, {
+      handlingTimeMinutes,
+    });
+
+    expect(handlingTimeMinutes).toBe(90);
+    expect(result.single).toBe(447);
+    expect(result.double).toBe(894);
   });
 });
 
