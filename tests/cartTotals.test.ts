@@ -117,6 +117,42 @@ describe("calculateCartTotals", () => {
     });
   });
 
+  describe("allowFreeDelivery", () => {
+    it("charges delivery above the threshold when free delivery is not allowed", () => {
+      // deliveryFee = 10, threshold = 40, cartNetto = 50 (above) but out of zone
+      const items: RawItem[] = [food20(12, 5)];
+      const result = calculateCartTotals(items, {
+        deliveryFeeNetto: 10,
+        allowFreeDelivery: false,
+      });
+
+      expect(result.freeShipping).toBe(false);
+      expect(result.deliveryFee).toBe(10);
+    });
+
+    it("still grants free delivery when explicitly allowed", () => {
+      const items: RawItem[] = [food20(12, 5)];
+      const result = calculateCartTotals(items, {
+        deliveryFeeNetto: 10,
+        allowFreeDelivery: true,
+      });
+
+      expect(result.freeShipping).toBe(true);
+      expect(result.deliveryFee).toBe(0);
+    });
+
+    it("defaults to allowing free delivery so existing callers are unchanged", () => {
+      const items: RawItem[] = [food20(12, 5)];
+      const withoutOption = calculateCartTotals(items, { deliveryFeeNetto: 10 });
+      const withOption = calculateCartTotals(items, {
+        deliveryFeeNetto: 10,
+        allowFreeDelivery: true,
+      });
+
+      expect(withoutOption).toEqual(withOption);
+    });
+  });
+
   describe("worker exclusion from threshold", () => {
     it("excludes personalkosten-speisen from threshold by default", () => {
       // Food netto = 10 (below threshold of 200)

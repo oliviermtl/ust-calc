@@ -122,6 +122,7 @@ export function calculateCartTotals(
 ): CartTotals {
   const {
     deliveryFeeNetto,
+    allowFreeDelivery = true,
     freeDeliveryMultiplier = 4,
     excludeFromThreshold = DEFAULT_EXCLUDED_PDFCATEGORY_KEYS,
     precision = 2,
@@ -149,7 +150,8 @@ export function calculateCartTotals(
       : itemsOnly;
   const cartNettoWithoutWorkers = thresholdBreakdown.totalNetto;
   const freeDeliveryFrom = deliveryFeeNetto * freeDeliveryMultiplier;
-  const freeShipping = cartNettoWithoutWorkers > freeDeliveryFrom;
+  const freeShipping =
+    allowFreeDelivery && cartNettoWithoutWorkers > freeDeliveryFrom;
 
   // 4. Final breakdown with shipping if applicable
   // Guard: no shipping when cart netto is negative (e.g. credit/refund carts)

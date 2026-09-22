@@ -69,3 +69,27 @@ export function createEmptyAddressComponents(): AddressComponents {
     formatted: "",
   };
 }
+
+/** Lowest Vienna district postal code (1010 = 1. Bezirk). */
+const VIENNA_ZIP_MIN = 1010;
+
+/** Highest Vienna district postal code (1230 = 23. Bezirk). */
+const VIENNA_ZIP_MAX = 1230;
+
+/**
+ * Whether a postal code belongs to a Vienna district.
+ *
+ * Only a bare four-digit code inside the district range counts. 1300 (Vienna
+ * Airport) lies in Lower Austria and is excluded, and anything unparseable is
+ * false: callers use this to grant a delivery discount, which must never fall
+ * out of malformed input.
+ */
+export function isViennaPostalCode(zip: string | null | undefined): boolean {
+  if (typeof zip !== "string") return false;
+
+  const trimmed = zip.trim();
+  if (!/^\d{4}$/.test(trimmed)) return false;
+
+  const code = Number(trimmed);
+  return code >= VIENNA_ZIP_MIN && code <= VIENNA_ZIP_MAX;
+}
