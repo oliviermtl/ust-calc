@@ -36,51 +36,52 @@ describe("DEFAULT_PRICE_CONFIG", () => {
   it("has expected values", () => {
     expect(DEFAULT_PRICE_CONFIG.handlingTimeMinutes).toBe(30);
     expect(DEFAULT_PRICE_CONFIG.rateDriverPerHour).toBe(48);
-    expect(DEFAULT_PRICE_CONFIG.gasCostPerLiter).toBe(1.5);
-    expect(DEFAULT_PRICE_CONFIG.fuelConsumptionPer100Km).toBe(15);
+    expect(DEFAULT_PRICE_CONFIG.vehicleCostPerKm).toBe(0.35);
+    expect(DEFAULT_PRICE_CONFIG.maxAverageSpeedKmh).toBe(65);
   });
 });
 
 describe("calculateDeliveryPrices", () => {
   it("calculates prices for typical Vienna delivery", () => {
-    // 10km one-way, 15 minutes one-way
+    // 10km one-way, 15 minutes one-way -> 40 km/h, under the trailer average
     const result = calculateDeliveryPrices(10000, 900);
 
     // Round trip: 20km, 30min + 30min handling = 60min total
     // Driver cost: (48/60) * 60 = 48
-    // Gas cost: 1.5 * 15/100 * 20 = 4.5
-    // Total: 52.5 -> 53
-    expect(result.single).toBe(53);
-    expect(result.double).toBe(106);
+    // Vehicle cost: 0.35 * 20 = 7
+    // Total: 55
+    expect(result.single).toBe(55);
+    expect(result.double).toBe(110);
     expect(result.calculationDetails.totalDistanceKm).toBe(20);
     expect(result.calculationDetails.totalDuration).toBe(60);
   });
 
   it("calculates prices for longer distance", () => {
-    // 50km one-way, 45 minutes one-way
+    // 50km one-way, 45 minutes one-way -> 66.7 km/h, so the trailer average
+    // stretches each leg to 50/65h = 46.15min.
     const result = calculateDeliveryPrices(50000, 2700);
 
-    // Round trip: 100km, 90min + 30min handling = 120min total
-    // Driver cost: (48/60) * 120 = 96
-    // Gas cost: 1.5 * 15/100 * 100 = 22.5
-    // Total: 118.5 -> 119
-    expect(result.single).toBe(119);
-    expect(result.double).toBe(238);
+    // Round trip: 100km, 92.31min + 30min handling = 122.31min total
+    // Driver cost: (48/60) * 122.31 = 97.85
+    // Vehicle cost: 0.35 * 100 = 35
+    // Total: 132.85 -> 133
+    expect(result.single).toBe(133);
+    expect(result.double).toBe(266);
     expect(result.calculationDetails.totalDistanceKm).toBe(100);
-    expect(result.calculationDetails.totalDuration).toBe(120);
+    expect(result.calculationDetails.totalDuration).toBe(122);
   });
 
   it("matches existing punsch-taxi-dashboard calculation", () => {
-    // Real-world test case: 15km, 20min one-way
+    // Real-world test case: 15km, 20min one-way -> 45 km/h, under the average
     // From calculatePriceByDistanceAndDuration.js
     const result = calculateDeliveryPrices(15000, 1200);
 
     // Round trip: 30km, 40min + 30min handling = 70min total
     // Driver cost: (48/60) * 70 = 56
-    // Gas cost: 1.5 * 15/100 * 30 = 6.75
-    // Total: 62.75 -> 63
-    expect(result.single).toBe(63);
-    expect(result.double).toBe(126);
+    // Vehicle cost: 0.35 * 30 = 10.5
+    // Total: 66.5 -> 67
+    expect(result.single).toBe(67);
+    expect(result.double).toBe(134);
   });
 
   it("handles custom config", () => {
@@ -91,9 +92,9 @@ describe("calculateDeliveryPrices", () => {
 
     // Round trip: 20km, 30min + 45min handling = 75min total
     // Driver cost: (60/60) * 75 = 75
-    // Gas cost: 1.5 * 15/100 * 20 = 4.5
-    // Total: 79.5 -> 80
-    expect(result.single).toBe(80);
+    // Vehicle cost: 0.35 * 20 = 7
+    // Total: 82
+    expect(result.single).toBe(82);
   });
 
   it("handles zero distance", () => {
@@ -101,34 +102,53 @@ describe("calculateDeliveryPrices", () => {
 
     // Only handling time: 30min
     // Driver cost: (48/60) * 30 = 24
-    // Gas cost: 0
+    // Vehicle cost: 0
     // Total: 24
     expect(result.single).toBe(24);
   });
 
-  it("bills fuel as price per litre x litres per 100km", () => {
-    // 100km one-way with no driving time isolates the fuel term:
-    // 200km round trip at 10 l/100km and 2 EUR/l = 20 litres per 100km
-    // -> 200 * (2 * 10/100) = 40 EUR of fuel, plus 30min handling at 60 EUR/h.
+  it("bills the vehicle cost on the round-trip distance", () => {
+    // 100km one-way at 0.20 EUR/km -> 200km round trip -> 40 EUR, whatever the
+    // driving time works out to.
     const result = calculateDeliveryPrices(100000, 0, {
-      gasCostPerLiter: 2,
-      fuelConsumptionPer100Km: 10,
-      rateDriverPerHour: 60,
-      handlingTimeMinutes: 30,
+      vehicleCostPerKm: 0.2,
     });
 
-    expect(result.calculationDetails.gasCost).toBe(40);
-    expect(result.calculationDetails.driverCost).toBe(30);
-    expect(result.single).toBe(70);
+    expect(result.calculationDetails.totalDistanceKm).toBe(200);
+    expect(result.calculationDetails.vehicleCost).toBe(40);
+  });
+
+  it("stretches a leg the route rates faster than the trailer average", () => {
+    // 50km in 45min is 66.7 km/h. A rig towing the Estafette does not hold
+    // that, so the leg becomes 50/65h = 46.15min and the round trip 122.31min.
+    const result = calculateDeliveryPrices(50000, 2700);
+
+    expect(result.calculationDetails.totalDuration).toBe(122);
+  });
+
+  it("leaves a leg the route already rates slower than the average alone", () => {
+    // 30km in 60min is 30 km/h — city traffic, nowhere near the cap.
+    const result = calculateDeliveryPrices(30000, 3600);
+
+    // 120min driving + 30min handling, untouched.
+    expect(result.calculationDetails.totalDuration).toBe(150);
+    expect(result.single).toBe(141);
+  });
+
+  it("rejects a speed cap that would make a leg take forever", () => {
+    expect(() =>
+      calculateDeliveryPrices(10000, 900, { maxAverageSpeedKmh: 0 }),
+    ).toThrow(/maxAverageSpeedKmh/);
   });
 
   it("prices the Wien -> Traboch delivery behind quote 2569", () => {
-    // 172.117km / 1h58 one-way from Jurekgasse 4, 1150 Wien.
-    // Round trip: 344.234km, 265.6min. Driver: 212.48, fuel: 77.45.
+    // 172.117km / 1h58 one-way from Jurekgasse 4, 1150 Wien. Google rates that
+    // 87.6 km/h; on a trailer it is 158.88min per leg.
+    // Round trip: 344.234km, 347.77min. Driver: 278.21, vehicle: 120.48.
     const result = calculateDeliveryPrices(172117, 7068);
 
-    expect(result.single).toBe(290);
-    expect(result.double).toBe(580);
+    expect(result.single).toBe(399);
+    expect(result.double).toBe(798);
   });
 });
 

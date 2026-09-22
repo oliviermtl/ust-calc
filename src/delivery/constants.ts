@@ -22,8 +22,17 @@ export const DELIVERY_ORIGINS: DeliveryOriginConfig = {
 export const DEFAULT_PRICE_CONFIG: PriceCalculationConfig = {
   handlingTimeMinutes: 30,
   rateDriverPerHour: 48,
-  gasCostPerLiter: 1.5,
-  fuelConsumptionPer100Km: 15,
+  /**
+   * Fuel for a rig towing the Estafette (~18 l/100km at 1.50 EUR/l) plus tyres,
+   * brakes, servicing and trailer wear. Still below the Austrian amtliches
+   * Kilometergeld of 0.50 EUR/km.
+   */
+  vehicleCostPerKm: 0.35,
+  /**
+   * A trailer is capped at 80 km/h by law and averages about 65 door to door,
+   * once ramps, towns and hills are counted.
+   */
+  maxAverageSpeedKmh: 65,
 };
 
 /**
