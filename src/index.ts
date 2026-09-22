@@ -28,6 +28,7 @@ export {
   formatAddressForDisplay,
   buildShortAddress,
   createEmptyAddressComponents,
+  isViennaPostalCode,
 } from "./delivery";
 
 export type {

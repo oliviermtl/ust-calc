@@ -68,6 +68,12 @@ export interface BreakdownOptions {
 export interface CartTotalsOptions {
   /** Netto delivery fee when shipping applies */
   deliveryFeeNetto: number;
+  /**
+   * Whether the free-shipping threshold may apply at all (default: true).
+   * Callers pass false outside the free-delivery zone, where the fee is
+   * charged whatever the cart is worth.
+   */
+  allowFreeDelivery?: boolean;
   /** Free-shipping multiplier applied to deliveryFeeNetto (default: 4) */
   freeDeliveryMultiplier?: number;
   /**

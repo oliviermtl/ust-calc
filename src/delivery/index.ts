@@ -34,4 +34,5 @@ export {
   formatAddressForDisplay,
   buildShortAddress,
   createEmptyAddressComponents,
+  isViennaPostalCode,
 } from "./address-utils";

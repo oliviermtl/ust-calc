@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   calculateDeliveryPrices,
+  isViennaPostalCode,
   selectOptimalOrigin,
   selectOriginForProducts,
   isChristmasSeason,
@@ -47,10 +48,10 @@ describe("calculateDeliveryPrices", () => {
 
     // Round trip: 20km, 30min + 30min handling = 60min total
     // Driver cost: (48/60) * 60 = 48
-    // Gas cost: (1.5/15) * 20 = 2
-    // Total: 50
-    expect(result.single).toBe(50);
-    expect(result.double).toBe(100);
+    // Gas cost: 1.5 * 15/100 * 20 = 4.5
+    // Total: 52.5 -> 53
+    expect(result.single).toBe(53);
+    expect(result.double).toBe(106);
     expect(result.calculationDetails.totalDistanceKm).toBe(20);
     expect(result.calculationDetails.totalDuration).toBe(60);
   });
@@ -61,10 +62,10 @@ describe("calculateDeliveryPrices", () => {
 
     // Round trip: 100km, 90min + 30min handling = 120min total
     // Driver cost: (48/60) * 120 = 96
-    // Gas cost: (1.5/15) * 100 = 10
-    // Total: 106
-    expect(result.single).toBe(106);
-    expect(result.double).toBe(212);
+    // Gas cost: 1.5 * 15/100 * 100 = 22.5
+    // Total: 118.5 -> 119
+    expect(result.single).toBe(119);
+    expect(result.double).toBe(238);
     expect(result.calculationDetails.totalDistanceKm).toBe(100);
     expect(result.calculationDetails.totalDuration).toBe(120);
   });
@@ -76,10 +77,10 @@ describe("calculateDeliveryPrices", () => {
 
     // Round trip: 30km, 40min + 30min handling = 70min total
     // Driver cost: (48/60) * 70 = 56
-    // Gas cost: (1.5/15) * 30 = 3
-    // Total: 59
-    expect(result.single).toBe(59);
-    expect(result.double).toBe(118);
+    // Gas cost: 1.5 * 15/100 * 30 = 6.75
+    // Total: 62.75 -> 63
+    expect(result.single).toBe(63);
+    expect(result.double).toBe(126);
   });
 
   it("handles custom config", () => {
@@ -90,9 +91,9 @@ describe("calculateDeliveryPrices", () => {
 
     // Round trip: 20km, 30min + 45min handling = 75min total
     // Driver cost: (60/60) * 75 = 75
-    // Gas cost: (1.5/15) * 20 = 2
-    // Total: 77
-    expect(result.single).toBe(77);
+    // Gas cost: 1.5 * 15/100 * 20 = 4.5
+    // Total: 79.5 -> 80
+    expect(result.single).toBe(80);
   });
 
   it("handles zero distance", () => {
@@ -103,6 +104,68 @@ describe("calculateDeliveryPrices", () => {
     // Gas cost: 0
     // Total: 24
     expect(result.single).toBe(24);
+  });
+
+  it("bills fuel as price per litre x litres per 100km", () => {
+    // 100km one-way with no driving time isolates the fuel term:
+    // 200km round trip at 10 l/100km and 2 EUR/l = 20 litres per 100km
+    // -> 200 * (2 * 10/100) = 40 EUR of fuel, plus 30min handling at 60 EUR/h.
+    const result = calculateDeliveryPrices(100000, 0, {
+      gasCostPerLiter: 2,
+      fuelConsumptionPer100Km: 10,
+      rateDriverPerHour: 60,
+      handlingTimeMinutes: 30,
+    });
+
+    expect(result.calculationDetails.gasCost).toBe(40);
+    expect(result.calculationDetails.driverCost).toBe(30);
+    expect(result.single).toBe(70);
+  });
+
+  it("prices the Wien -> Traboch delivery behind quote 2569", () => {
+    // 172.117km / 1h58 one-way from Jurekgasse 4, 1150 Wien.
+    // Round trip: 344.234km, 265.6min. Driver: 212.48, fuel: 77.45.
+    const result = calculateDeliveryPrices(172117, 7068);
+
+    expect(result.single).toBe(290);
+    expect(result.double).toBe(580);
+  });
+});
+
+describe("isViennaPostalCode", () => {
+  it("accepts every Vienna district code", () => {
+    for (const zip of ["1010", "1020", "1100", "1150", "1220", "1230"]) {
+      expect(isViennaPostalCode(zip)).toBe(true);
+    }
+  });
+
+  it("rejects codes just outside the Vienna range", () => {
+    expect(isViennaPostalCode("1009")).toBe(false);
+    expect(isViennaPostalCode("1231")).toBe(false);
+  });
+
+  it("rejects Vienna airport, which is in Lower Austria", () => {
+    expect(isViennaPostalCode("1300")).toBe(false);
+  });
+
+  it("rejects codes elsewhere in Austria", () => {
+    expect(isViennaPostalCode("8772")).toBe(false); // Traboch
+    expect(isViennaPostalCode("5242")).toBe(false); // St. Johann am Walde
+    expect(isViennaPostalCode("2340")).toBe(false); // Mödling
+  });
+
+  it("rejects anything that is not a bare four-digit code", () => {
+    // Free delivery is granted, never defaulted to: unusable input pays.
+    expect(isViennaPostalCode("1150 Wien")).toBe(false);
+    expect(isViennaPostalCode("A-1150")).toBe(false);
+    expect(isViennaPostalCode("")).toBe(false);
+    expect(isViennaPostalCode("   ")).toBe(false);
+    expect(isViennaPostalCode(null)).toBe(false);
+    expect(isViennaPostalCode(undefined)).toBe(false);
+  });
+
+  it("tolerates surrounding whitespace", () => {
+    expect(isViennaPostalCode(" 1150 ")).toBe(true);
   });
 });
 

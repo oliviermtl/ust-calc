@@ -9,7 +9,7 @@ import type { DeliveryPrices, PriceCalculationConfig } from "./types";
  * - Round trip distance and duration (multiply by 2)
  * - Add handling time to duration
  * - Driver cost = (rate per hour / 60) * total duration in minutes
- * - Gas cost = (cost per liter / consumption per 100km) * total distance in km
+ * - Gas cost = cost per liter * (consumption per 100km / 100) * total distance in km
  * - Total = driver cost + gas cost
  *
  * @param distanceMeters - One-way distance in meters
@@ -41,8 +41,12 @@ export function calculateDeliveryPrices(
     .dividedBy(60)
     .times(totalDurationMinutes);
 
+  // `fuelConsumptionPer100Km` is litres per 100km, so the litres burnt per
+  // kilometre is consumption / 100. Dividing by the consumption instead only
+  // ever matched at 10 l/100km, which is what the original dashboard formula
+  // used; at the current 15 l/100km it undercharged fuel by a factor of 2.25.
   const gasCost = new Decimal(cfg.gasCostPerLiter)
-    .dividedBy(cfg.fuelConsumptionPer100Km)
+    .times(new Decimal(cfg.fuelConsumptionPer100Km).dividedBy(100))
     .times(totalDistanceKm);
 
   const costTotal = driverCost.plus(gasCost);
