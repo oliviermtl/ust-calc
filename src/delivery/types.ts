@@ -61,16 +61,8 @@ export interface PriceCalculationConfig {
   handlingTimeMinutes: number;
   /** Driver rate per hour in EUR (default: 48) */
   rateDriverPerHour: number;
-  /**
-   * Vehicle cost per km in EUR: fuel, tyres, servicing and trailer wear
-   * (default: 0.35)
-   */
+  /** Vehicle cost per km in EUR (default: 0.225) */
   vehicleCostPerKm: number;
-  /**
-   * Assumed door-to-door average speed in km/h. The routing duration is raised
-   * to match it when the route implies anything faster (default: 65)
-   */
-  maxAverageSpeedKmh: number;
 }
 
 /**
