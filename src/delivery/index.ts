@@ -19,7 +19,10 @@ export {
 } from "./constants";
 
 // Price calculation
-export { calculateDeliveryPrices } from "./price-calculator";
+export {
+  calculateDeliveryPrices,
+  resolveHandlingTimeMinutes,
+} from "./price-calculator";
 
 // Origin selection
 export {

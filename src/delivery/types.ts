@@ -49,7 +49,7 @@ export interface DeliveryPrices {
     totalDistanceKm: number;
     totalDuration: number;
     driverCost: number;
-    gasCost: number;
+    vehicleCost: number;
   };
 }
 
@@ -61,10 +61,8 @@ export interface PriceCalculationConfig {
   handlingTimeMinutes: number;
   /** Driver rate per hour in EUR (default: 48) */
   rateDriverPerHour: number;
-  /** Cost per liter of fuel in EUR (default: 1.50) */
-  gasCostPerLiter: number;
-  /** Fuel consumption in liters per 100km (default: 15) */
-  fuelConsumptionPer100Km: number;
+  /** Vehicle cost per km in EUR (default: 0.225) */
+  vehicleCostPerKm: number;
 }
 
 /**

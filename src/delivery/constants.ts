@@ -22,8 +22,13 @@ export const DELIVERY_ORIGINS: DeliveryOriginConfig = {
 export const DEFAULT_PRICE_CONFIG: PriceCalculationConfig = {
   handlingTimeMinutes: 30,
   rateDriverPerHour: 48,
-  gasCostPerLiter: 1.5,
-  fuelConsumptionPer100Km: 15,
+  /**
+   * Fuel only: 1.50 EUR/l at 15 l/100km, the two figures this replaced. Tyres,
+   * servicing and trailer wear are real per-kilometre costs and are knowingly
+   * not billed — raising this was reverted as a business decision, not because
+   * the number was wrong.
+   */
+  vehicleCostPerKm: 0.225,
 };
 
 /**

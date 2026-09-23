@@ -77,7 +77,7 @@ export interface AddressHandlerResult {
       totalDistanceKm: number;
       totalDuration: number;
       driverCost: number;
-      gasCost: number;
+      vehicleCost: number;
     };
   };
   selectedOrigin?: DeliveryOrigin;

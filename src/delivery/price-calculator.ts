@@ -9,8 +9,8 @@ import type { DeliveryPrices, PriceCalculationConfig } from "./types";
  * - Round trip distance and duration (multiply by 2)
  * - Add handling time to duration
  * - Driver cost = (rate per hour / 60) * total duration in minutes
- * - Gas cost = cost per liter * (consumption per 100km / 100) * total distance in km
- * - Total = driver cost + gas cost
+ * - Vehicle cost = cost per km * total distance in km
+ * - Total = driver cost + vehicle cost
  *
  * @param distanceMeters - One-way distance in meters
  * @param durationSeconds - One-way duration in seconds
@@ -28,28 +28,24 @@ export function calculateDeliveryPrices(
   const distanceM = new Decimal(distanceMeters);
   const durationS = new Decimal(durationSeconds);
 
-  // Calculate round trip values
+  const totalDistanceKm = distanceM.times(2).dividedBy(1000);
+
   const totalDurationMinutes = durationS
     .dividedBy(60)
     .times(2)
     .plus(cfg.handlingTimeMinutes);
-
-  const totalDistanceKm = distanceM.times(2).dividedBy(1000);
 
   // Calculate costs
   const driverCost = new Decimal(cfg.rateDriverPerHour)
     .dividedBy(60)
     .times(totalDurationMinutes);
 
-  // `fuelConsumptionPer100Km` is litres per 100km, so the litres burnt per
-  // kilometre is consumption / 100. Dividing by the consumption instead only
-  // ever matched at 10 l/100km, which is what the original dashboard formula
-  // used; at the current 15 l/100km it undercharged fuel by a factor of 2.25.
-  const gasCost = new Decimal(cfg.gasCostPerLiter)
-    .times(new Decimal(cfg.fuelConsumptionPer100Km).dividedBy(100))
-    .times(totalDistanceKm);
+  // One rate per kilometre, replacing the price-per-litre and litres-per-100km
+  // pair: the two only ever appeared as their product, and splitting them
+  // invited the division bug that undercharged fuel for two years.
+  const vehicleCost = new Decimal(cfg.vehicleCostPerKm).times(totalDistanceKm);
 
-  const costTotal = driverCost.plus(gasCost);
+  const costTotal = driverCost.plus(vehicleCost);
 
   return {
     single: costTotal.toDecimalPlaces(0).toNumber(),
@@ -58,7 +54,32 @@ export function calculateDeliveryPrices(
       totalDistanceKm: totalDistanceKm.toDecimalPlaces(0).toNumber(),
       totalDuration: totalDurationMinutes.toDecimalPlaces(0).toNumber(),
       driverCost: driverCost.toDecimalPlaces(0).toNumber(),
-      gasCost: gasCost.toDecimalPlaces(0).toNumber(),
+      vehicleCost: vehicleCost.toDecimalPlaces(0).toNumber(),
     },
   };
+}
+
+/**
+ * The handling time a cart implies, in minutes.
+ *
+ * Loading a vehicle onto a trailer and strapping it down takes longer than
+ * handing over a crate, so a product may declare its own handling time. All of
+ * a cart's products share one trip and the slowest sets the pace, so this takes
+ * the largest declared value — and never drops below the default, because the
+ * base load and unload happens on every delivery whatever is in the van. A
+ * product can therefore raise the floor but never lower it.
+ *
+ * @param declaredMinutes - Each item's own handling time; null or undefined for
+ *   every product that has not declared one
+ * @param defaultMinutes - The floor, defaulting to the shared config value
+ * @returns The handling time to price the trip with
+ */
+export function resolveHandlingTimeMinutes(
+  declaredMinutes: ReadonlyArray<number | null | undefined>,
+  defaultMinutes: number = DEFAULT_PRICE_CONFIG.handlingTimeMinutes,
+): number {
+  return declaredMinutes.reduce<number>((longest, minutes) => {
+    const value = Number(minutes);
+    return Number.isFinite(value) && value > longest ? value : longest;
+  }, defaultMinutes);
 }

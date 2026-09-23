@@ -19,6 +19,7 @@ export {
   DISTANCE_MATRIX_DEPARTURE_TIME,
   // Price calculation
   calculateDeliveryPrices,
+  resolveHandlingTimeMinutes,
   // Origin selection
   isChristmasSeason,
   selectOptimalOrigin,

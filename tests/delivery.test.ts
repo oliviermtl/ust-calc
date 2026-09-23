@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   calculateDeliveryPrices,
+  resolveHandlingTimeMinutes,
   isViennaPostalCode,
   selectOptimalOrigin,
   selectOriginForProducts,
@@ -36,8 +37,7 @@ describe("DEFAULT_PRICE_CONFIG", () => {
   it("has expected values", () => {
     expect(DEFAULT_PRICE_CONFIG.handlingTimeMinutes).toBe(30);
     expect(DEFAULT_PRICE_CONFIG.rateDriverPerHour).toBe(48);
-    expect(DEFAULT_PRICE_CONFIG.gasCostPerLiter).toBe(1.5);
-    expect(DEFAULT_PRICE_CONFIG.fuelConsumptionPer100Km).toBe(15);
+    expect(DEFAULT_PRICE_CONFIG.vehicleCostPerKm).toBe(0.225);
   });
 });
 
@@ -48,7 +48,7 @@ describe("calculateDeliveryPrices", () => {
 
     // Round trip: 20km, 30min + 30min handling = 60min total
     // Driver cost: (48/60) * 60 = 48
-    // Gas cost: 1.5 * 15/100 * 20 = 4.5
+    // Vehicle cost: 0.225 * 20 = 4.5
     // Total: 52.5 -> 53
     expect(result.single).toBe(53);
     expect(result.double).toBe(106);
@@ -62,7 +62,7 @@ describe("calculateDeliveryPrices", () => {
 
     // Round trip: 100km, 90min + 30min handling = 120min total
     // Driver cost: (48/60) * 120 = 96
-    // Gas cost: 1.5 * 15/100 * 100 = 22.5
+    // Vehicle cost: 0.225 * 100 = 22.5
     // Total: 118.5 -> 119
     expect(result.single).toBe(119);
     expect(result.double).toBe(238);
@@ -77,7 +77,7 @@ describe("calculateDeliveryPrices", () => {
 
     // Round trip: 30km, 40min + 30min handling = 70min total
     // Driver cost: (48/60) * 70 = 56
-    // Gas cost: 1.5 * 15/100 * 30 = 6.75
+    // Vehicle cost: 0.225 * 30 = 6.75
     // Total: 62.75 -> 63
     expect(result.single).toBe(63);
     expect(result.double).toBe(126);
@@ -91,7 +91,7 @@ describe("calculateDeliveryPrices", () => {
 
     // Round trip: 20km, 30min + 45min handling = 75min total
     // Driver cost: (60/60) * 75 = 75
-    // Gas cost: 1.5 * 15/100 * 20 = 4.5
+    // Vehicle cost: 0.225 * 20 = 4.5
     // Total: 79.5 -> 80
     expect(result.single).toBe(80);
   });
@@ -101,34 +101,85 @@ describe("calculateDeliveryPrices", () => {
 
     // Only handling time: 30min
     // Driver cost: (48/60) * 30 = 24
-    // Gas cost: 0
+    // Vehicle cost: 0
     // Total: 24
     expect(result.single).toBe(24);
   });
 
-  it("bills fuel as price per litre x litres per 100km", () => {
-    // 100km one-way with no driving time isolates the fuel term:
-    // 200km round trip at 10 l/100km and 2 EUR/l = 20 litres per 100km
-    // -> 200 * (2 * 10/100) = 40 EUR of fuel, plus 30min handling at 60 EUR/h.
+  it("bills the vehicle cost on the round-trip distance", () => {
+    // 100km one-way at 0.20 EUR/km -> 200km round trip -> 40 EUR.
     const result = calculateDeliveryPrices(100000, 0, {
-      gasCostPerLiter: 2,
-      fuelConsumptionPer100Km: 10,
-      rateDriverPerHour: 60,
-      handlingTimeMinutes: 30,
+      vehicleCostPerKm: 0.2,
     });
 
-    expect(result.calculationDetails.gasCost).toBe(40);
-    expect(result.calculationDetails.driverCost).toBe(30);
-    expect(result.single).toBe(70);
+    expect(result.calculationDetails.totalDistanceKm).toBe(200);
+    expect(result.calculationDetails.vehicleCost).toBe(40);
+  });
+
+  it("bills one rate per kilometre, not a price per litre over a consumption", () => {
+    // The pair this replaced was `gasCostPerLiter / fuelConsumptionPer100Km`,
+    // a division that only matched at 10 l/100km and undercharged every longer
+    // delivery. 0.225 is the product the business actually meant: 1.50 EUR/l at
+    // 15 l/100km.
+    const result = calculateDeliveryPrices(100000, 0);
+
+    expect(result.calculationDetails.vehicleCost).toBe(45);
   });
 
   it("prices the Wien -> Traboch delivery behind quote 2569", () => {
     // 172.117km / 1h58 one-way from Jurekgasse 4, 1150 Wien.
-    // Round trip: 344.234km, 265.6min. Driver: 212.48, fuel: 77.45.
+    // Round trip: 344.234km, 265.6min. Driver: 212.48, vehicle: 77.45.
     const result = calculateDeliveryPrices(172117, 7068);
 
     expect(result.single).toBe(290);
     expect(result.double).toBe(580);
+  });
+});
+
+describe("resolveHandlingTimeMinutes", () => {
+  it("falls back to the default when no product declares one", () => {
+    expect(resolveHandlingTimeMinutes([null, undefined, null])).toBe(30);
+  });
+
+  it("uses the longest declared time", () => {
+    expect(resolveHandlingTimeMinutes([null, 90, 45])).toBe(90);
+  });
+
+  it("never drops below the default", () => {
+    // A product may raise the floor, never lower it: the base load and unload
+    // happens on every delivery whatever is in the van.
+    expect(resolveHandlingTimeMinutes([10, 20])).toBe(30);
+  });
+
+  it("ignores values that are not finite numbers", () => {
+    expect(
+      resolveHandlingTimeMinutes([
+        NaN,
+        Infinity,
+        "90" as unknown as number,
+        undefined,
+      ]),
+    ).toBe(90);
+  });
+
+  it("accepts a custom floor", () => {
+    expect(resolveHandlingTimeMinutes([], 45)).toBe(45);
+  });
+
+  it("handles an empty cart", () => {
+    expect(resolveHandlingTimeMinutes([])).toBe(30);
+  });
+
+  it("prices a trailered truck to Traboch", () => {
+    // 90 minutes of handling instead of 30 adds an hour of driver time (48 EUR).
+    const handlingTimeMinutes = resolveHandlingTimeMinutes([null, 90]);
+    const result = calculateDeliveryPrices(172117, 7068, {
+      handlingTimeMinutes,
+    });
+
+    expect(handlingTimeMinutes).toBe(90);
+    expect(result.single).toBe(338);
+    expect(result.double).toBe(676);
   });
 });
 
