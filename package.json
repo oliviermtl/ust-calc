@@ -1,6 +1,6 @@
 {
   "name": "@oliviermtlbali/ust-calc",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "description": "Shared Austrian VAT (USt) calculation and delivery pricing library",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
