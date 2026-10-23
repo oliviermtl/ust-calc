@@ -65,6 +65,11 @@ export interface BreakdownOptions {
   precision?: number;
 }
 
+export interface BruttoBreakdownOptions {
+  /** Delivery fee in netto (20% VAT applied). Explicitly netto to prevent confusion. */
+  shippingCostNetto?: number;
+}
+
 export interface CartTotalsOptions {
   /** Netto delivery fee when shipping applies */
   deliveryFeeNetto: number;
