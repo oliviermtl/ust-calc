@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculateBruttoVatBreakdown, calculateVatBreakdown } from "../src";
+import { calculateBruttoVatBreakdown, calculateVatBreakdown, getBruttoPrice } from "../src";
 import type { RawItem } from "../src/types";
 
 describe("calculateBruttoVatBreakdown", () => {
@@ -96,6 +96,91 @@ describe("calculateBruttoVatBreakdown", () => {
     const empty = calculateBruttoVatBreakdown([]);
     expect(empty.totalBrutto).toBe(0);
     expect(empty.grandTotal).toBe(0);
+  });
+
+  it("matches the discounted line brutto that getBruttoPrice prints", () => {
+    // Unit 9.99 at 15% off = 8.4915 → 8.49; 7 × 8.49 = 59.43, not 7 × 8.4915 = 59.44.
+    const item: RawItem = { price: 9.99, ust: 10, quantity: 7, discount: 15 };
+    const result = calculateBruttoVatBreakdown([item]);
+
+    expect(getBruttoPrice(item)).toBe(8.49);
+    expect(result.totalBrutto).toBe(59.43);
+    expect(result.netto10 + result.vat10).toBeCloseTo(59.43, 10);
+  });
+
+  it("matches getBruttoPrice × quantity for every discounted line", () => {
+    for (const discount of [5, 7, 10, 15, 33, 50]) {
+      for (const price of [3.9, 6.5, 9.99, 15.9, 29.5]) {
+        for (const quantity of [1, 3, 7, 24]) {
+          const item: RawItem = { price, ust: 20, quantity, discount };
+          const expected = Math.round(getBruttoPrice(item) * quantity * 100);
+          const result = calculateBruttoVatBreakdown([item]);
+
+          expect(Math.round(result.totalBrutto * 100), `${quantity} × ${price} −${discount}%`)
+            .toBe(expected);
+        }
+      }
+    }
+  });
+
+  it("skips a line whose price or quantity is not a number", () => {
+    const items = [
+      { price: 6.5, ust: 20, quantity: 2 },
+      { price: undefined, ust: 20, quantity: 1 },
+      { price: Number.NaN, ust: 20, quantity: 1 },
+      { price: 5, ust: 20, value: "abc" },
+    ] as unknown as RawItem[];
+    const result = calculateBruttoVatBreakdown(items);
+
+    expect(result.totalBrutto).toBe(13);
+    expect(result.netto20).toBe(10.83);
+    expect(result.vat20).toBe(2.17);
+    expect(result.grandTotal).toBe(13);
+  });
+
+  it("reads a string value as the quantity", () => {
+    const result = calculateBruttoVatBreakdown([{ price: 6.5, ust: 20, value: "24" }]);
+
+    expect(result.totalBrutto).toBe(156);
+    expect(result.netto20).toBe(130);
+  });
+
+  it("splits a rate other than 10% or 0% at 20%", () => {
+    const result = calculateBruttoVatBreakdown([{ price: 12, ust: 13, quantity: 1 }]);
+
+    expect(result.netto20).toBe(10);
+    expect(result.vat20).toBe(2);
+    expect(result.netto10).toBe(0);
+  });
+
+  it("ignores a shipping netto of zero or below", () => {
+    const items: RawItem[] = [{ price: 12, ust: 20, quantity: 1 }];
+
+    for (const shippingCostNetto of [0, -5]) {
+      const result = calculateBruttoVatBreakdown(items, { shippingCostNetto });
+      expect(result.netto20).toBe(10);
+      expect(result.totalBrutto).toBe(12);
+    }
+  });
+
+  it("keeps the totals equal to the sum of their rates across mixed carts", () => {
+    const toCents = (value: number) => Math.round(value * 100);
+    const prices = [0.99, 3.9, 6.5, 9.5, 11.5, 15.9, 25.5, -1];
+    for (let seed = 1; seed <= 400; seed++) {
+      const items: RawItem[] = [
+        { price: prices[seed % 8], ust: 20, quantity: (seed % 13) + 1 },
+        { price: prices[(seed * 3) % 8], ust: 10, quantity: (seed % 7) + 1 },
+        { price: prices[(seed * 5) % 8], ust: 20, quantity: (seed % 5) + 1, discount: seed % 20 },
+        { price: 1, ust: 0, quantity: seed % 4 },
+      ];
+      const r = calculateBruttoVatBreakdown(items, { shippingCostNetto: seed % 3 === 0 ? 8.33 : 0 });
+      const label = `seed ${seed}`;
+
+      expect(toCents(r.totalNetto), label).toBe(toCents(r.netto10) + toCents(r.netto20));
+      expect(toCents(r.totalVat), label).toBe(toCents(r.vat10) + toCents(r.vat20));
+      expect(toCents(r.totalBrutto), label).toBe(toCents(r.totalNetto) + toCents(r.totalVat));
+      expect(toCents(r.grandTotal), label).toBe(toCents(r.totalBrutto) + toCents(r.tipTotal));
+    }
   });
 
   it("leaves calculateVatBreakdown's unit-netto totals unchanged", () => {

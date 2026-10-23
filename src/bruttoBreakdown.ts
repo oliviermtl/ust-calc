@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 import { normalizeItem } from "./normalize";
-import type { RawItem, TaxableItem, VatBreakdown, BruttoBreakdownOptions } from "./types";
+import { getBruttoPrice } from "./core";
+import type { RawItem, VatBreakdown, BruttoBreakdownOptions } from "./types";
 
 const CENT_PLACES = 2;
 const SHIPPING_VAT_RATE = 20;
@@ -8,10 +9,12 @@ const SHIPPING_VAT_RATE = 20;
 const roundToCents = (value: Decimal) =>
   value.toDecimalPlaces(CENT_PLACES, Decimal.ROUND_HALF_UP);
 
-/** A line's brutto, its discount taken off before any rounding. */
-function lineBrutto({ price, quantity, discount }: TaxableItem): Decimal {
-  const kept = new Decimal(1).minus(new Decimal(discount).div(100));
-  return new Decimal(price).times(quantity).times(kept);
+/**
+ * A line's brutto: the unit brutto `getBruttoPrice` prints (a discounted unit
+ * rounded to the cent) times the quantity, so the breakdown matches the lines.
+ */
+function lineBrutto(item: RawItem, quantity: number): Decimal {
+  return new Decimal(getBruttoPrice(item)).times(quantity);
 }
 
 /** Split one rate's brutto into netto and USt that add back up to the cent. */
@@ -29,12 +32,17 @@ function splitBrutto(brutto: Decimal, vatRate: number) {
  * therefore always equals the summed brutto — the amount the customer pays.
  *
  * `calculateVatBreakdown` rounds each unit's netto first instead, which drifts
- * by a cent every few units (24 × €6.50 → 130.08 + 26.02 = 156.10). Callers
- * that check totals against a cart built with it must keep using it until
- * both sides switch together.
+ * by a cent every few units (24 × €6.50 → 130.08 + 26.02 = 156.10). The two
+ * also differ on a discounted line: this one takes the discount off the unit
+ * brutto, `calculateVatBreakdown` (default `discountOn: "netto"`) off the unit
+ * netto, so 3 × €9.99 at 15% off is 25.47 here and 25.48 there. A caller whose
+ * totals are checked against the other side (the invoice API re-prices the
+ * sites' carts) must switch together with that side.
  *
- * Buckets: 20% (also any rate that isn't 10% or 0%), 10%, and 0% (tips).
- * `shippingCostNetto` joins the 20% bucket at its exact brutto.
+ * Buckets: 20% (also any rate that isn't 10% or 0%, split at 20%), 10%, and
+ * 0% (tips). A line without a numeric price or quantity is skipped.
+ * A positive `shippingCostNetto` joins the 20% bucket at its exact brutto; a fee
+ * given in fractions of a cent may print a cent away from the netto passed in.
  *
  * Items should already be filtered (e.g. `inSumme === true`) before passing here.
  */
@@ -51,7 +59,9 @@ export function calculateBruttoVatBreakdown(
   for (const item of items) {
     if (!item) continue;
     const normalized = normalizeItem(item);
-    const brutto = lineBrutto(normalized);
+    // A line without a numeric price or quantity adds nothing, as in getNettoPrice.
+    if (!Number.isFinite(Number(item.price)) || !Number.isFinite(normalized.quantity)) continue;
+    const brutto = lineBrutto({ ...item, price: Number(item.price) }, normalized.quantity);
 
     if (normalized.vatRate === 0) {
       tipTotal = tipTotal.plus(brutto);
