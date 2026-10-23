@@ -1,12 +1,14 @@
 export { normalizeItem } from "./normalize";
 export { getNettoPrice, getBruttoFromNetto, getBruttoPrice } from "./core";
 export { calculateVatBreakdown, calculateCartTotals } from "./breakdown";
+export { calculateBruttoVatBreakdown } from "./bruttoBreakdown";
 export type {
   RawItem,
   TaxableItem,
   VatBreakdown,
   NettoOptions,
   BreakdownOptions,
+  BruttoBreakdownOptions,
   CartTotalsOptions,
   CartTotals,
 } from "./types";

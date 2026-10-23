@@ -65,6 +65,8 @@ export interface BreakdownOptions {
   precision?: number;
 }
 
+export type BruttoBreakdownOptions = Pick<BreakdownOptions, "shippingCostNetto">;
+
 export interface CartTotalsOptions {
   /** Netto delivery fee when shipping applies */
   deliveryFeeNetto: number;
